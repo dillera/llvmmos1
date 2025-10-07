@@ -1,0 +1,15 @@
+# Build artifacts
+build/
+dist/
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
