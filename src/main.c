@@ -3,92 +3,84 @@
  * Built with llvm-mos compiler
  */
 
-#include <atari.h>
+#include <stdio.h>
 #include <peekpoke.h>
-#include <string.h>
+#include <atari.h>
 
-// Atari screen memory (text mode)
-#define SCREEN_MEM 0x3C00
-#define COLOR_REGISTER 0x2C8
+// Screen memory and OS locations
+#define SAVMSC  0x58    // Screen memory pointer (2 bytes)
 
-// Function to clear the screen
-void clear_screen(void) {
-    unsigned char i;
-    for (i = 0; i < 240; i++) {
-        POKE(SCREEN_MEM + i, 0);
-    }
-}
+// OS shadow registers for colors
+#define COLOR0  0x2C4  // Background color
+#define COLOR1  0x2C5  // Border color
+#define COLOR2  0x2C6
+#define COLOR4  0x2C8  // Text color
 
-// Function to print text at a specific screen position
-void print_at(unsigned char x, unsigned char y, const char* text) {
-    unsigned int pos = SCREEN_MEM + (y * 40) + x;
-    unsigned char i = 0;
-    
-    while (text[i] != '\0') {
-        unsigned char ch = text[i];
-        
-        // Convert ASCII to ATASCII screen codes
-        if (ch >= 'a' && ch <= 'z') {
-            ch = ch - 'a' + 97;  // lowercase
-        } else if (ch >= 'A' && ch <= 'Z') {
-            ch = ch - 'A' + 33;  // uppercase (inverse video)
-        } else if (ch >= '0' && ch <= '9') {
-            ch = ch - '0' + 16;
-        } else if (ch == ' ') {
-            ch = 0;
-        } else if (ch == '!') {
-            ch = 1;
-        }
-        
-        POKE(pos + i, ch);
-        i++;
-    }
-}
-
-// Function to set background and border colors
+// Function to set colors
 void set_colors(unsigned char bg, unsigned char border) {
-    POKE(712, bg);      // Background color
-    POKE(710, border);  // Border color
+    POKE(712, bg);      // Background (OS shadow of COLOR2)
+    POKE(710, border);  // Border (OS shadow of COLOR1)
+    POKE(709, 0x0F);    // Text color (bright white)
+}
+
+// Convert digit to ATASCII screen code
+unsigned char digit_to_screen(unsigned char digit) {
+    return digit + 16;  // 0-9 -> screen codes 16-25
 }
 
 // Main program
 int main(void) {
-    unsigned char counter = 0;
+    unsigned int counter = 0;
     unsigned int delay;
+    unsigned char color = 0x84;
+    unsigned int screen_mem;
+    unsigned int counter_pos;
     
-    // Initialize display
-    clear_screen();
+    // Get screen memory location
+    screen_mem = PEEK(SAVMSC) | (PEEK(SAVMSC + 1) << 8);
     
-    // Set colors (background: dark blue, border: light blue)
-    set_colors(0x84, 0x7C);
+    // Set initial colors
+    set_colors(color, 0x74);
     
-    // Display welcome message
-    print_at(5, 4, "LLVM-MOS TEST PROGRAM");
-    print_at(5, 5, "=====================");
+    // Clear screen and print header
+    printf("%c", CH_CLR);  // Clear screen
     
-    print_at(3, 8, "ATARI 800XL DEVELOPMENT");
-    print_at(3, 10, "Built with llvm-mos compiler");
+    printf("\n\n");
+    printf("  ===========================\n");
+    printf("   LLVM-MOS TEST PROGRAM\n");
+    printf("  ===========================\n\n");
     
-    print_at(3, 14, "Counter: 0");
+    printf("  Atari 800XL Development\n\n");
+    printf("  Built with llvm-mos\n");
+    printf("  compiler toolkit\n\n\n");
     
-    // Main loop - simple counter animation
+    printf("  Counter: 00000\n");
+    
+    // Calculate screen position for counter digits
+    // Row 12 (0-indexed from top), column 11 (after "  Counter: ")
+    counter_pos = screen_mem + (12 * 40) + 11;
+    
+    // Main loop - counter display
     while (1) {
-        // Simple delay loop
-        for (delay = 0; delay < 5000; delay++) {
+        // Update counter digits directly to screen memory
+        POKE(counter_pos + 0, digit_to_screen((counter / 10000) % 10));
+        POKE(counter_pos + 1, digit_to_screen((counter / 1000) % 10));
+        POKE(counter_pos + 2, digit_to_screen((counter / 100) % 10));
+        POKE(counter_pos + 3, digit_to_screen((counter / 10) % 10));
+        POKE(counter_pos + 4, digit_to_screen(counter % 10));
+        
+        // Simple delay
+        for (delay = 0; delay < 3000; delay++) {
             // Busy wait
         }
         
         counter++;
+        if (counter > 99999) counter = 0;  // Reset at 100000
         
-        // Update counter display
-        POKE(SCREEN_MEM + (14 * 40) + 12, 16 + (counter / 100) % 10);
-        POKE(SCREEN_MEM + (14 * 40) + 13, 16 + (counter / 10) % 10);
-        POKE(SCREEN_MEM + (14 * 40) + 14, 16 + counter % 10);
-        
-        // Cycle background color
+        // Cycle background color every 16 counts
         if ((counter & 0x0F) == 0) {
-            unsigned char color = PEEK(712);
-            color = (color + 2) & 0xFE;
+            color = (color + 4) & 0xFE;
+            if (color < 0x20) color = 0x84;  // Reset if too dark
             POKE(712, color);
         }
     }

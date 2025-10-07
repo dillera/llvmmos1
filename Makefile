@@ -1,5 +1,8 @@
 # Makefile for Atari 800XL LLVM-MOS Project
 
+# Add llvm-mos to PATH
+export PATH := /opt/llvm-mos/bin:$(PATH)
+
 # Project name
 PROJECT = atari-test
 
@@ -9,8 +12,8 @@ BUILD_DIR = build
 DIST_DIR = dist
 
 # Compiler and tools
-CC = mos-atari8-clang
-LD = mos-atari8-clang
+CC = mos-atari8-dos-clang
+LD = mos-atari8-dos-clang
 OBJCOPY = llvm-objcopy
 
 # Compiler flags
@@ -22,7 +25,6 @@ SOURCES = $(wildcard $(SRC_DIR)/*.c)
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
 
 # Output files
-ELF = $(BUILD_DIR)/$(PROJECT).elf
 XEX = $(DIST_DIR)/$(PROJECT).xex
 ATR = $(DIST_DIR)/$(PROJECT).atr
 
@@ -39,15 +41,10 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Link object files to create ELF executable
-$(ELF): $(OBJECTS)
-	@echo "Linking $(ELF)..."
+# Link object files to create XEX executable (mos-atari8-dos outputs XEX directly)
+$(XEX): $(OBJECTS)
+	@echo "Linking and creating Atari XEX executable..."
 	$(LD) $(LDFLAGS) $(OBJECTS) -o $@
-
-# Convert ELF to XEX (Atari executable format)
-$(XEX): $(ELF)
-	@echo "Creating Atari XEX executable..."
-	$(OBJCOPY) -O binary $(ELF) $@
 	@echo "Built: $@"
 
 # Create ATR disk image
